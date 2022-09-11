@@ -1,6 +1,7 @@
 import win32ui, win32gui,win32con
 import numpy as np
 from PIL import Image
+import pyautogui
 import time
 
 class WindowCapture:
@@ -71,25 +72,20 @@ class WindowCapture:
             'RGB',
             (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
             bmpstr, 'raw', 'BGRX', 0, 1)
-        print(img)
 
         win32gui.DeleteObject(saveBitMap.GetHandle())
         saveDC.DeleteDC()
         mfcDC.DeleteDC()
         win32gui.ReleaseDC(hdesktop, hwndDC)
-
-        # drop the alpha channel, or cv.matchTemplate() will throw an error like:
-        #   error: (-215:Assertion failed) (depth == CV_8U || depth == CV_32F) && type == _templ.type()
-        #   && _img.dims() <= 2 in function 'cv::matchTemplate'
         # img = img[...,:3]
-
-        # make image C_CONTIGUOUS to avoid errors that look like:
-        #   File ... in draw_rectangles
-        #   TypeError: an integer is required (got type tuple)
-        # see the discussion here:
-        # https://github.com/opencv/opencv/issues/14866#issuecomment-580207109
         img = np.ascontiguousarray(img)
         return img
+
+    def get_screenshot_py_autogui(self):
+        rect = win32gui.GetWindowRect(self.hwnd)
+        region = rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]
+        frame = np.array(pyautogui.screenshot(region=region))
+        return frame
 
     def get_screen_position(self, pos):
         return (pos[0] + self.offset_x, pos[1] + self.offset_y)

@@ -3,21 +3,10 @@ import argparse
 import numpy as np
 
 class AimModel():
-    def __init__(self, model_path, classes = None, confThreshold=0.5, nmsThreshold=0.5):
+    def __init__(self, model_path, classes = ["enemy"], confThreshold=0.5, nmsThreshold=0.5):
         # with open('coco.names', 'rt') as f:
         #     self.classes = f.read().rstrip('\n').split('\n')
-        if not classes:
-            self.classes = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-            'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-            'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-            'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
-            'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-            'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-            'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-            'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
-            'hair drier', 'toothbrush']  #
-        else:
-            self.classes = classes
+        self.classes = classes
         self.colors = [np.random.randint(0, 255, size=3).tolist() for _ in range(len(self.classes))]
         num_classes = len(self.classes)
         self.anchors = [[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]]
@@ -124,32 +113,50 @@ class AimModel():
         # Sets the input to the network
         blob = cv2.dnn.blobFromImage(im, 1 / 255.0, (self.inpWidth, self.inpHeight), [0, 0, 0], swapRB=True, crop=False)
         self.net.setInput(blob)
-        outs = self.net.forward(self.net.getUnconnectedOutLayersNames())[0]
+        layerNames = self.net.getLayerNames()
+        lastLayerId = self.net.getLayerId(layerNames[-1])
+        lastLayer = self.net.getLayer(lastLayerId)
+        print(layerNames[-1])
+        outs = self.net.forward(self.net.getUnconnectedOutLayersNames())
         # NMS
         pred = self.non_max_suppression(outs, self.confThreshold, agnostic=False)
+        print(pred)
         # draw box
-        for i in pred[0]:
-            classId = i[5]
-            if classId == 0:
-                left = int((i[0] - wh[0]) / ratio[0])
-                top = int((i[1] - wh[1]) / ratio[1])
-                width = int((i[2] - wh[0]) / ratio[0])
-                height = int((i[3] - wh[1]) / ratio[1])
-                conf = i[4]
-                print(left,top,width, height)
-                # frame = self.drawPred(frame, classIds[i], confidences[i], left, top, left + width, top + height)
-                cv2.rectangle(srcimg, (int(left), int(top)), (int(width), int(height)), (0, 0, 255), thickness=1)
-                label = '%.2f' % conf
-                label = '%s:%s' % (self.classes[int(classId)], label)
-                # Display the label at the top of the bounding box
-                labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                top = max(top, labelSize[1])
-                # cv2.rectangle(srcimg, (int(left), int(top - round(1.5 * labelSize[1]))), (int(left + round(1.5 * labelSize[0])), int(top + baseLine)), (255,255,255), cv2.FILLED)
-                cv2.putText(srcimg, label, (int(left - 20), int(top - 10)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0),
-                            thickness=1)
+        # for i in pred[0]:
+        #     left = int((i[0] - wh[0]) / ratio[0])
+        #     top = int((i[1] - wh[1]) / ratio[1])
+        #     width = int((i[2] - wh[0]) / ratio[0])
+        #     height = int((i[3] - wh[1]) / ratio[1])
+        #     conf = i[4]
+        #     classId = i[5]
+        #     # frame = self.drawPred(frame, classIds[i], confidences[i], left, top, left + width, top + height)
+        #     cv2.rectangle(srcimg, (int(left), int(top)), (int(width), int(height)), (0, 0, 255), thickness=2)
+        #     label = '%.2f' % conf
+        #     label = '%s:%s' % (self.classes[int(classId)], label)
+        #     # Display the label at the top of the bounding box
+        #     labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+        #     top = max(top, labelSize[1])
+        #     # cv2.rectangle(srcimg, (int(left), int(top - round(1.5 * labelSize[1]))), (int(left + round(1.5 * labelSize[0])), int(top + baseLine)), (255,255,255), cv2.FILLED)
+        #     cv2.putText(srcimg, label, (int(left - 20), int(top - 10)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0),
+        #                 thickness=2)
+        for out in pred:
+            for detection in out:
+                scores = detection[5:]
+                classId = np.argmax(scores)
+                confidence = scores[classId]
+                if confidence > self.confThreshold:
+                    center_x = int(detection[0] * self.inpWidth)
+                    center_y = int(detection[1] * self.inpHeight)
+                    width = int(detection[2] * self.inpWidth)
+                    height = int(detection[3] * self.inpWidth)
+                    left = int(center_x - width / 2)
+                    top = int(center_y - height / 2)
+                    classIds.append(classId)
+                    confidences.append(float(confidence))
+                    boxes.append([left, top, width, height])
         cv2.imshow('show', srcimg)
         cv2.waitKey(1)
 
-# model = yolov5("cfg/deploy/yolov7", confThreshold=0.5, nmsThreshold=0.5)
+    # model = yolov5("cfg/deploy/yolov7", confThreshold=0.5, nmsThreshold=0.5)
 # srcimg = cv2.imread("inference/images/bus.jpg")
 # model.detect(srcimg)

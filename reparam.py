@@ -6,7 +6,7 @@ import yaml
 
 device = select_device('0', batch_size=1)
 # model trained by cfg/training/*.yaml
-ckpt = torch.load('best.pt', map_location=device)
+ckpt = torch.load('cfg/custom_training/model/best.pt', map_location=device)
 # reparameterized model in cfg/deploy/*.yaml
 model = Model('cfg/deploy/yolov7-custom.yaml', ch=3, nc=1).to(device)
 
@@ -41,4 +41,4 @@ ckpt = {'model': deepcopy(model.module if is_parallel(model) else model).half(),
         'epoch': -1}
 
 # save reparameterized model
-torch.save(ckpt, 'cfg/deploy/best-reparam.pt')
+torch.save(ckpt, 'cfg/custom_training/model/best-reparam.pt')
